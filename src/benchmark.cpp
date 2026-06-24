@@ -110,3 +110,116 @@ void run_rsa_benchmark_csv(int bits, const std::string& out_csv) {
 }
 
 } // namespace rsatool
+
+#include "rsatool/file_utils.hpp"
+#include "rsatool/hybrid.hpp"
+#include "rsatool/rsa_keys.hpp"
+
+#include <filesystem>
+
+namespace rsatool {
+
+void run_hybrid_benchmark_csv(
+    const std::string& public_key_pem,
+    const std::string& private_key_pem,
+    const std::string& out_csv
+) {
+    const CryptoPP::RSA::PublicKey pub = load_public_key_pem(public_key_pem);
+    const CryptoPP::RSA::PrivateKey priv = load_private_key_pem(private_key_pem);
+
+    const std::vector<size_t> sizes = {
+        1024,
+        1024 * 1024,
+        100 * 1024 * 1024
+    };
+
+    std::ofstream out(out_csv);
+    if (!out) {
+        throw std::runtime_error("cannot open hybrid benchmark CSV for writing: " + out_csv);
+    }
+
+    out << "mode,size_bytes,iterations,total_encrypt_ms,avg_encrypt_ms,total_decrypt_ms,avg_decrypt_ms,throughput_encrypt_mib_s,throughput_decrypt_mib_s\n";
+
+    const std::filesystem::path tmp_dir = std::filesystem::path(out_csv).parent_path() / "tmp_hybrid_bench";
+    std::filesystem::create_directories(tmp_dir);
+
+    std::cout << "[INFO] Hybrid benchmark output CSV: " << out_csv << "\n";
+
+    for (size_t size : sizes) {
+        std::vector<uint8_t> plaintext(size);
+        for (size_t i = 0; i < plaintext.size(); ++i) {
+            plaintext[i] = static_cast<uint8_t>(i & 0xff);
+        }
+
+        size_t iterations = 50;
+        if (size >= 1024 * 1024) {
+            iterations = 10;
+        }
+        if (size >= 100 * 1024 * 1024) {
+            iterations = 1;
+        }
+
+        const std::filesystem::path envelope_path =
+            tmp_dir / ("hybrid_" + std::to_string(size) + ".json");
+
+        // Warm-up
+        hybrid_encrypt_file(pub, plaintext, envelope_path.string());
+        volatile auto warm_plain = hybrid_decrypt_file(priv, envelope_path.string());
+        (void)warm_plain;
+
+        const auto enc_start = std::chrono::steady_clock::now();
+        for (size_t i = 0; i < iterations; ++i) {
+            hybrid_encrypt_file(pub, plaintext, envelope_path.string());
+        }
+        const auto enc_end = std::chrono::steady_clock::now();
+
+        const double enc_total_ms =
+            std::chrono::duration<double, std::milli>(enc_end - enc_start).count();
+
+        const auto dec_start = std::chrono::steady_clock::now();
+        for (size_t i = 0; i < iterations; ++i) {
+            volatile auto recovered = hybrid_decrypt_file(priv, envelope_path.string());
+            (void)recovered;
+        }
+        const auto dec_end = std::chrono::steady_clock::now();
+
+        const double dec_total_ms =
+            std::chrono::duration<double, std::milli>(dec_end - dec_start).count();
+
+        const double enc_avg_ms = enc_total_ms / static_cast<double>(iterations);
+        const double dec_avg_ms = dec_total_ms / static_cast<double>(iterations);
+
+        const double total_mib =
+            (static_cast<double>(size) * static_cast<double>(iterations)) /
+            (1024.0 * 1024.0);
+
+        const double enc_throughput =
+            total_mib / (enc_total_ms / 1000.0);
+
+        const double dec_throughput =
+            total_mib / (dec_total_ms / 1000.0);
+
+        out << "hybrid,"
+            << size << ","
+            << iterations << ","
+            << std::fixed << std::setprecision(6)
+            << enc_total_ms << ","
+            << enc_avg_ms << ","
+            << dec_total_ms << ","
+            << dec_avg_ms << ","
+            << enc_throughput << ","
+            << dec_throughput << "\n";
+
+        std::cout << "[OK] size=" << size
+                  << " bytes, iterations=" << iterations
+                  << ", enc_avg_ms=" << enc_avg_ms
+                  << ", dec_avg_ms=" << dec_avg_ms
+                  << ", enc_MiB_s=" << enc_throughput
+                  << ", dec_MiB_s=" << dec_throughput
+                  << "\n";
+    }
+
+    std::cout << "[OK] Hybrid benchmark completed\n";
+}
+
+} // namespace rsatool

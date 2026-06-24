@@ -39,6 +39,21 @@ std::string get_arg(int argc, char* argv[], const std::string& name) {
 }
 
 
+
+int run_bench_hybrid(int argc, char* argv[]) {
+    const std::string pub_path = get_arg(argc, argv, "--pub");
+    const std::string priv_path = get_arg(argc, argv, "--priv");
+    const std::string out_path = get_arg(argc, argv, "--out");
+
+    if (pub_path.empty() || priv_path.empty() || out_path.empty()) {
+        std::cerr << "ERROR: bench-hybrid requires --pub pub.pem --priv priv.pem --out benchmark.csv\n";
+        return 1;
+    }
+
+    rsatool::run_hybrid_benchmark_csv(pub_path, priv_path, out_path);
+    return 0;
+}
+
 int run_bench(int argc, char* argv[]) {
     const std::string bits_str = get_arg(argc, argv, "--bits");
     const std::string out_path = get_arg(argc, argv, "--out");
@@ -302,6 +317,10 @@ int main(int argc, char* argv[]) {
 
         if (command == "bench") {
             return run_bench(argc, argv);
+        }
+
+        if (command == "bench-hybrid") {
+            return run_bench_hybrid(argc, argv);
         }
 
         std::cerr << "ERROR: unknown command: " << command << "\n";
