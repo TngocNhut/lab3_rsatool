@@ -1,0 +1,4 @@
+mode,size_bytes,iterations,total_encrypt_ms,avg_encrypt_ms,total_decrypt_ms,avg_decrypt_ms,throughput_encrypt_mib_s,throughput_decrypt_mib_s
+hybrid,1024,50,12.802459,0.256049,225.011934,4.500239,3.813965,0.217002
+hybrid,1048576,10,200.469758,20.046976,257.290342,25.729034,49.882836,38.866597
+hybrid,104857600,1,2774.254012,2774.254012,3017.645656,3017.645656,36.045726,33.138417

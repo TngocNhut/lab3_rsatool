@@ -7,16 +7,19 @@ cmake-build*/
 *.a
 *.o
 
+# Do not commit secrets or runtime crypto artifacts
 artifacts/**/*.pem
 artifacts/**/*.der
 artifacts/**/*.bin
 artifacts/**/*.ct
 artifacts/**/*.json
-artifacts/**/*.csv
 artifacts/**/*.log
 
+# Allow benchmark CSV files
+!artifacts/
+!artifacts/**/
 !artifacts/**/benchmark/
-!artifacts/**/screenshots/
+!artifacts/**/benchmark/*.csv
 
 .DS_Store
 .vscode/
