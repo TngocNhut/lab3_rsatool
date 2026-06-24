@@ -12,6 +12,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(rsatool
     src/main.cpp
+    src/file_utils.cpp
+    src/encoding.cpp
+    src/rsa_keys.cpp
 )
 
 target_include_directories(rsatool
