@@ -16,6 +16,7 @@ add_executable(rsatool
     src/encoding.cpp
     src/rsa_keys.cpp
     src/rsa_oaep.cpp
+    src/hybrid.cpp
 )
 
 target_include_directories(rsatool

@@ -1,4 +1,5 @@
 #include "rsatool/file_utils.hpp"
+#include "rsatool/hybrid.hpp"
 #include "rsatool/rsa_keys.hpp"
 #include "rsatool/rsa_oaep.hpp"
 
@@ -143,10 +144,22 @@ int run_encrypt(int argc, char* argv[]) {
     const size_t max_plaintext = rsatool::rsa_oaep_sha256_max_plaintext_size_bytes(pub);
 
     if (plaintext.size() > max_plaintext) {
-        std::cerr << "ERROR: plaintext size " << plaintext.size()
-                  << " bytes exceeds direct RSA-OAEP-SHA256 limit "
-                  << max_plaintext << " bytes. Hybrid mode will be implemented next.\n";
-        return 1;
+        if (!label.empty()) {
+            std::cerr << "ERROR: OAEP label is not enabled in hybrid checkpoint; use empty label for now\n";
+            return 1;
+        }
+
+        rsatool::hybrid_encrypt_file(pub, plaintext, out_path);
+
+        std::cout << "[OK] Hybrid encryption completed\n";
+        std::cout << "[OK] Mode: RSA-OAEP-SHA256 + AES-256-GCM\n";
+        std::cout << "[OK] Public key: " << pub_path << "\n";
+        std::cout << "[OK] Plaintext file: " << in_path << "\n";
+        std::cout << "[OK] Envelope file: " << out_path << "\n";
+        std::cout << "[OK] Plaintext size: " << plaintext.size() << " bytes\n";
+        std::cout << "[INFO] Direct RSA max plaintext: " << max_plaintext << " bytes\n";
+        std::cout << "[INFO] Reason: plaintext exceeds RSA-OAEP direct limit, switched to hybrid mode\n";
+        return 0;
     }
 
     const std::vector<uint8_t> ciphertext =
@@ -177,11 +190,32 @@ int run_decrypt(int argc, char* argv[]) {
         return 1;
     }
 
-    const std::vector<uint8_t> ciphertext = rsatool::read_binary_file(in_path);
     const CryptoPP::RSA::PrivateKey priv = rsatool::load_private_key_pem(priv_path);
 
-    const std::vector<uint8_t> plaintext =
-        rsatool::rsa_oaep_sha256_decrypt(priv, ciphertext, label);
+    std::vector<uint8_t> plaintext;
+
+    if (rsatool::is_hybrid_envelope_file(in_path)) {
+        if (!label.empty()) {
+            std::cerr << "ERROR: OAEP label is not enabled in hybrid checkpoint; use empty label for now\n";
+            return 1;
+        }
+
+        plaintext = rsatool::hybrid_decrypt_file(priv, in_path);
+
+        rsatool::write_binary_file(out_path, plaintext);
+
+        std::cout << "[OK] Hybrid decryption completed\n";
+        std::cout << "[OK] Mode: RSA-OAEP-SHA256 + AES-256-GCM\n";
+        std::cout << "[OK] Private key: " << priv_path << "\n";
+        std::cout << "[OK] Envelope file: " << in_path << "\n";
+        std::cout << "[OK] Output plaintext: " << out_path << "\n";
+        std::cout << "[OK] Plaintext size: " << plaintext.size() << " bytes\n";
+        return 0;
+    }
+
+    const std::vector<uint8_t> ciphertext = rsatool::read_binary_file(in_path);
+
+    plaintext = rsatool::rsa_oaep_sha256_decrypt(priv, ciphertext, label);
 
     rsatool::write_binary_file(out_path, plaintext);
 
