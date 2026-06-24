@@ -1,3 +1,4 @@
+#include "rsatool/benchmark.hpp"
 #include "rsatool/file_utils.hpp"
 #include "rsatool/hybrid.hpp"
 #include "rsatool/rsa_keys.hpp"
@@ -35,6 +36,28 @@ std::string get_arg(int argc, char* argv[], const std::string& name) {
         }
     }
     return {};
+}
+
+
+int run_bench(int argc, char* argv[]) {
+    const std::string bits_str = get_arg(argc, argv, "--bits");
+    const std::string out_path = get_arg(argc, argv, "--out");
+
+    if (bits_str.empty() || out_path.empty()) {
+        std::cerr << "ERROR: bench requires --bits 3072|4096 --out benchmark.csv\n";
+        return 1;
+    }
+
+    int bits = 0;
+    try {
+        bits = std::stoi(bits_str);
+    } catch (...) {
+        std::cerr << "ERROR: invalid --bits value\n";
+        return 1;
+    }
+
+    rsatool::run_rsa_benchmark_csv(bits, out_path);
+    return 0;
 }
 
 int run_selftest() {
@@ -194,6 +217,12 @@ int run_decrypt(int argc, char* argv[]) {
 
     std::vector<uint8_t> plaintext;
 
+    if (rsatool::looks_like_json_envelope_file(in_path) &&
+        !rsatool::is_hybrid_envelope_file(in_path)) {
+        std::cerr << "ERROR: unsupported or invalid hybrid envelope mode\n";
+        return 1;
+    }
+
     if (rsatool::is_hybrid_envelope_file(in_path)) {
         if (!label.empty()) {
             std::cerr << "ERROR: OAEP label is not enabled in hybrid checkpoint; use empty label for now\n";
@@ -269,6 +298,10 @@ int main(int argc, char* argv[]) {
 
         if (command == "decrypt") {
             return run_decrypt(argc, argv);
+        }
+
+        if (command == "bench") {
+            return run_bench(argc, argv);
         }
 
         std::cerr << "ERROR: unknown command: " << command << "\n";

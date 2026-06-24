@@ -198,4 +198,23 @@ bool is_hybrid_envelope_file(const std::string& in_path) {
     }
 }
 
+
+bool looks_like_json_envelope_file(const std::string& in_path) {
+    try {
+        const std::vector<uint8_t> file_bytes = read_binary_file(in_path);
+        const std::string text(file_bytes.begin(), file_bytes.end());
+        const nlohmann::json j = nlohmann::json::parse(text);
+
+        return j.is_object() && (
+            j.contains("mode") ||
+            j.contains("wrapped_key") ||
+            j.contains("ciphertext") ||
+            j.contains("tag") ||
+            j.contains("iv")
+        );
+    } catch (...) {
+        return false;
+    }
+}
+
 } // namespace rsatool

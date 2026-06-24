@@ -20,5 +20,6 @@ std::vector<uint8_t> hybrid_decrypt_file(
 );
 
 bool is_hybrid_envelope_file(const std::string& in_path);
+bool looks_like_json_envelope_file(const std::string& in_path);
 
 } // namespace rsatool
