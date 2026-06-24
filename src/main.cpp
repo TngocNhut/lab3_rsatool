@@ -1,4 +1,6 @@
+#include "rsatool/file_utils.hpp"
 #include "rsatool/rsa_keys.hpp"
+#include "rsatool/rsa_oaep.hpp"
 
 #include <cryptopp/osrng.h>
 #include <cryptopp/rsa.h>
@@ -7,6 +9,7 @@
 #include <exception>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -109,11 +112,85 @@ int run_keyinfo(int argc, char* argv[]) {
         return 1;
     }
 
+    const CryptoPP::RSA::PublicKey pub = rsatool::load_public_key_pem(pub_path);
+    const size_t max_plaintext = rsatool::rsa_oaep_sha256_max_plaintext_size_bytes(pub);
+
     std::cout << "[OK] Public key: " << pub_path << "\n";
     std::cout << "[OK] RSA modulus size: " << bits << " bits\n";
     std::cout << "[OK] Minimum requirement satisfied: RSA >= 3072 bits\n";
     std::cout << "[INFO] Intended padding: OAEP\n";
     std::cout << "[INFO] Intended hash: SHA-256\n";
+    std::cout << "[INFO] Direct RSA-OAEP-SHA256 max plaintext: "
+              << max_plaintext << " bytes\n";
+
+    return 0;
+}
+
+int run_encrypt(int argc, char* argv[]) {
+    const std::string in_path = get_arg(argc, argv, "--in");
+    const std::string pub_path = get_arg(argc, argv, "--pub");
+    const std::string out_path = get_arg(argc, argv, "--out");
+    const std::string label = get_arg(argc, argv, "--label");
+
+    if (in_path.empty() || pub_path.empty() || out_path.empty()) {
+        std::cerr << "ERROR: encrypt requires --in msg.bin --pub pub.pem --out ct.bin [--label text]\n";
+        return 1;
+    }
+
+    const std::vector<uint8_t> plaintext = rsatool::read_binary_file(in_path);
+    const CryptoPP::RSA::PublicKey pub = rsatool::load_public_key_pem(pub_path);
+
+    const size_t max_plaintext = rsatool::rsa_oaep_sha256_max_plaintext_size_bytes(pub);
+
+    if (plaintext.size() > max_plaintext) {
+        std::cerr << "ERROR: plaintext size " << plaintext.size()
+                  << " bytes exceeds direct RSA-OAEP-SHA256 limit "
+                  << max_plaintext << " bytes. Hybrid mode will be implemented next.\n";
+        return 1;
+    }
+
+    const std::vector<uint8_t> ciphertext =
+        rsatool::rsa_oaep_sha256_encrypt(pub, plaintext, label);
+
+    rsatool::write_binary_file(out_path, ciphertext);
+
+    std::cout << "[OK] RSA-OAEP-SHA256 encryption completed\n";
+    std::cout << "[OK] Public key: " << pub_path << "\n";
+    std::cout << "[OK] Plaintext file: " << in_path << "\n";
+    std::cout << "[OK] Ciphertext file: " << out_path << "\n";
+    std::cout << "[OK] Plaintext size: " << plaintext.size() << " bytes\n";
+    std::cout << "[OK] Ciphertext size: " << ciphertext.size() << " bytes\n";
+    std::cout << "[OK] Direct RSA max plaintext: " << max_plaintext << " bytes\n";
+    std::cout << "[INFO] OAEP label size: " << label.size() << " bytes\n";
+
+    return 0;
+}
+
+int run_decrypt(int argc, char* argv[]) {
+    const std::string in_path = get_arg(argc, argv, "--in");
+    const std::string priv_path = get_arg(argc, argv, "--priv");
+    const std::string out_path = get_arg(argc, argv, "--out");
+    const std::string label = get_arg(argc, argv, "--label");
+
+    if (in_path.empty() || priv_path.empty() || out_path.empty()) {
+        std::cerr << "ERROR: decrypt requires --in ct.bin --priv priv.pem --out msg.bin [--label text]\n";
+        return 1;
+    }
+
+    const std::vector<uint8_t> ciphertext = rsatool::read_binary_file(in_path);
+    const CryptoPP::RSA::PrivateKey priv = rsatool::load_private_key_pem(priv_path);
+
+    const std::vector<uint8_t> plaintext =
+        rsatool::rsa_oaep_sha256_decrypt(priv, ciphertext, label);
+
+    rsatool::write_binary_file(out_path, plaintext);
+
+    std::cout << "[OK] RSA-OAEP-SHA256 decryption completed\n";
+    std::cout << "[OK] Private key: " << priv_path << "\n";
+    std::cout << "[OK] Ciphertext file: " << in_path << "\n";
+    std::cout << "[OK] Output plaintext: " << out_path << "\n";
+    std::cout << "[OK] Plaintext size: " << plaintext.size() << " bytes\n";
+    std::cout << "[INFO] OAEP label size: " << label.size() << " bytes\n";
 
     return 0;
 }
@@ -150,6 +227,14 @@ int main(int argc, char* argv[]) {
 
         if (command == "keyinfo") {
             return run_keyinfo(argc, argv);
+        }
+
+        if (command == "encrypt") {
+            return run_encrypt(argc, argv);
+        }
+
+        if (command == "decrypt") {
+            return run_decrypt(argc, argv);
         }
 
         std::cerr << "ERROR: unknown command: " << command << "\n";
