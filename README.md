@@ -2,23 +2,14 @@
 # Lab 3 - RSA-OAEP and Hybrid Encryption
 
 
-
-Student: Tran Ngoc Nhat
-
+Họ Tên: Trần Ngọc Nhất
+MSSV: 24162086
 
 
 ## Goal
+ RSA-OAEP with SHA-256 and hybrid envelope encryption using RSA-OAEP + AES-256-GCM.
 
-
-
-This project implements RSA-OAEP with SHA-256 and hybrid envelope encryption using RSA-OAEP + AES-256-GCM.
-
-
-
-## Required features
-
-
-
+## Tính năng cần build
 - RSA-3072 key generation
 
 - RSA-4096 performance comparison
@@ -39,7 +30,7 @@ This project implements RSA-OAEP with SHA-256 and hybrid envelope encryption usi
 
 
 
-## Build on Windows MSYS2 UCRT64
+## Lệnh Build, sử dụng Windows MSYS2 UCRT64
 
 
 
